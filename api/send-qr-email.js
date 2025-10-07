@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import QRCode from "qrcode";
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
