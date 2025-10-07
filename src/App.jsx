@@ -2,8 +2,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
+
+// ---- Supabase & Poll ----
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-const pollId = "indah-samudra-painting-2025";
+const pollId = import.meta.env.VITE_POLL_ID || "indah-samudra-painting-2025";
 
 export default function App(){
   const [route,setRoute]=useState(window.location.hash||"");
@@ -14,6 +16,7 @@ export default function App(){
   return <PublicVote/>;
 }
 
+// ---------------- Public Vote ----------------
 function PublicVote(){
   const [pinInput,setPinInput]=useState("");
   const [unitInput,setUnitInput]=useState("");
@@ -24,16 +27,27 @@ function PublicVote(){
   const [confirmId,setConfirmId]=useState(null);
   const [loading,setLoading]=useState(true);
 
-  const designs=[{id:"A",name:"Design A – Dark Green & Yellow",image:"/images/design-a.jpg"},
-                 {id:"B",name:"Design B – Grey Modern",image:"/images/design-b.jpg"},
-                 {id:"C",name:"Design C – Earthy Beige",image:"/images/design-c.jpg"}];
+  const designs=[
+    {id:"A",name:"Design A – Dark Green & Yellow",image:"/images/design-a.jpg"},
+    {id:"B",name:"Design B – Grey Modern",image:"/images/design-b.jpg"},
+    {id:"C",name:"Design C – Earthy Beige",image:"/images/design-c.jpg"}
+  ];
 
   useEffect(()=>{(async()=>{
     const usp=new URLSearchParams(window.location.search);
     const t=usp.get("t");
     if(t){
-      const {data:row}=await supabase.from("pins").select("unit,owner_name,pin,used_at").eq("poll_id",pollId).eq("token",t).maybeSingle();
-      if(row){ setPinRecord(row); setPinInput(row.pin); if(row.unit) setUnitInput(row.unit); if(row.owner_name) setOwnerInput(row.owner_name); if(row.used_at) setVotedFor("USED"); }
+      const {data:row}=await supabase
+        .from("pins")
+        .select("unit,owner_name,pin,used_at")
+        .eq("poll_id",pollId).eq("token",t).maybeSingle();
+      if(row){
+        setPinRecord(row);
+        setPinInput(row.pin);
+        if(row.unit) setUnitInput(row.unit);
+        if(row.owner_name) setOwnerInput(row.owner_name);
+        if(row.used_at) setVotedFor("USED");
+      }
     }
     await refreshResults(); setLoading(false);
   })()},[]);
@@ -46,7 +60,10 @@ function PublicVote(){
 
   async function lookupPin(){
     if(!pinInput.trim()){ alert("Enter PIN"); return; }
-    const {data:row}=await supabase.from("pins").select("unit,owner_name,pin,used_at").eq("poll_id",pollId).eq("pin",pinInput.trim()).maybeSingle();
+    const {data:row}=await supabase
+      .from("pins")
+      .select("unit,owner_name,pin,used_at")
+      .eq("poll_id",pollId).eq("pin",pinInput.trim()).maybeSingle();
     if(!row){ alert("PIN not found."); return; }
     setPinRecord(row);
     if(row.unit) setUnitInput(row.unit);
@@ -173,10 +190,16 @@ function PublicVote(){
   </div>;
 }
 
+// ---------------- Admin Login ----------------
 function AdminLogin(){
   const [email,setEmail]=useState("");
   const [pw,setPw]=useState("");
-  async function sha256(t){const enc=new TextEncoder().encode(t);const h=await crypto.subtle.digest("SHA-256",enc);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+
+  async function sha256(t){
+    const enc=new TextEncoder().encode(t);
+    const h=await crypto.subtle.digest("SHA-256",enc);
+    return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
   async function login(){
     if(!email||!pw) return;
     const {data}=await supabase.from("admins").select("pass_sha256").eq("email",email.trim().toLowerCase()).maybeSingle();
@@ -197,6 +220,7 @@ function AdminLogin(){
   </div>;
 }
 
+// ---------------- Admin Setup ----------------
 function AdminSetup(){
   const [code,setCode]=useState("");
   const [email,setEmail]=useState("");
@@ -234,6 +258,7 @@ function AdminSetup(){
   </div>;
 }
 
+// ---------------- Admin Dashboard ----------------
 function AdminDashboard(){
   const [me,setMe]=useState(localStorage.getItem("adminEmail")||"");
   const [counts,setCounts]=useState({A:0,B:0,C:0});
@@ -241,23 +266,41 @@ function AdminDashboard(){
   const [pins,setPins]=useState([]);
   const [siteUrl,setSiteUrl]=useState(typeof window!=='undefined'?window.location.origin:"");
   const [genCount,setGenCount]=useState(172);
+  const [status,setStatus]=useState({pins:0,votes:0,pollId});
 
   useEffect(()=>{ if(!me) window.location.hash="#admin-login"; },[me]);
   useEffect(()=>{ (async()=>{ await refresh(); })(); },[]);
 
   async function refresh(){
-    const { data:v } = await supabase.from("votes").select("pin,unit,name,option_id,created_at").eq("poll_id",pollId).order("created_at",{ascending:false});
+    const { data:v } = await supabase.from("votes")
+      .select("pin,unit,name,option_id,created_at").eq("poll_id",pollId)
+      .order("created_at",{ascending:false});
     const tally={A:0,B:0,C:0}; (v||[]).forEach(r=>{ tally[r.option_id]=(tally[r.option_id]||0)+1; });
     setCounts(tally); setVotes(v||[]);
-    const { data:p } = await supabase.from("pins").select("unit,owner_name,pin,token,used_at,used_option").eq("poll_id",pollId).order("unit");
+    const { data:p } = await supabase.from("pins")
+      .select("unit,owner_name,pin,token,used_at,used_option").eq("poll_id",pollId)
+      .order("unit");
     setPins(p||[]);
+    setStatus(s=>({ ...s, pins: (p||[]).length, votes: (v||[]).length }));
   }
 
+  // ---- Excel-friendly CSV (BOM + CRLF) ----
   function csvDownload(filename, rows){
-    const csv = rows.map(r=>r.map(c=>`"${String(c).replaceAll('"','""')}"`).join(",")).join("\n");
-    const blob=new Blob([csv],{type:"text/csv"}); const url=URL.createObjectURL(blob);
-    const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+    const BOM = '\ufeff';
+    const csv = rows
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(','))
+      .join('\r\n');
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
+
   function exportTallies(){ csvDownload(`${pollId}-tally.csv`, [["Design","Votes"],["A",counts.A],["B",counts.B],["C",counts.C]]); }
   function exportVotes(){ csvDownload(`${pollId}-votes.csv`, [["PIN","Unit","Owner","Option","Time"], ...votes.map(v=>[v.pin,v.unit||"",v.name||"",v.option_id,new Date(v.created_at).toISOString()])]); }
   function exportPins(){ csvDownload(`${pollId}-pins.csv`, [["Unit","Owner","PIN","Link","Used At","Used Option"], ...pins.map(p=>[p.unit||"",p.owner_name||"",p.pin,`${siteUrl}/?t=${p.token}`,p.used_at||"",p.used_option||""])]); }
@@ -269,20 +312,30 @@ function AdminDashboard(){
     await refresh(); alert("Poll reset.");
   }
 
-  function randomPin(){ return String(Math.floor(100000 + Math.random()*900000)); }
-
+  // ---- Reliable PIN generation (bulk insert, no collisions) ----
+  function randPin(){ return String(Math.floor(100000 + Math.random()*900000)); }
   async function generatePins(){
-    const target = Number(genCount)||0;
-    if(target<=0) { alert("Enter how many PINs to generate."); return; }
-    let created = 0, attempts = 0;
-    while(created < target && attempts < target*10){
-      attempts++;
-      const pin = randomPin();
-      const { error } = await supabase.from("pins").insert({ poll_id: pollId, pin, token: crypto.randomUUID() });
-      if(!error){ created++; }
+    const target = Number(genCount) || 0;
+    if (target <= 0) { alert("Enter how many PINs to generate."); return; }
+
+    const { data: existingRows, error: selErr } =
+      await supabase.from("pins").select("pin").eq("poll_id", pollId);
+    if (selErr) { alert("Cannot read existing pins: " + selErr.message); return; }
+
+    const existing = new Set((existingRows || []).map(r => r.pin));
+    const toInsert = [];
+    while (toInsert.length < target){
+      const p = randPin();
+      if (existing.has(p)) continue;
+      existing.add(p);
+      toInsert.push({ poll_id: pollId, pin: p }); // token default in DB
     }
+
+    const { error: insErr } = await supabase.from("pins").insert(toInsert);
+    if (insErr) { alert("Insert failed: " + insErr.message); return; }
+
     await refresh();
-    alert(`Generated ${created} PIN(s).`);
+    alert(`Generated ${toInsert.length} PIN(s).`);
   }
 
   return <div className="container">
@@ -298,10 +351,21 @@ function AdminDashboard(){
         <button className="btn" style={{background:"#fee2e2"}} onClick={resetAll}>Reset</button>
       </div>
       <div className="space"></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,fontSize:13}}>
+        <div>Poll ID: <span className="mono">{pollId}</span></div>
+        <div>Pins in DB: <b>{status.pins}</b></div>
+        <div>Votes in DB: <b>{status.votes}</b></div>
+        <div>Site: <span className="mono">{siteUrl}</span></div>
+      </div>
+    </div>
+
+    <div className="space"></div>
+    <div className="panel">
+      <div style={{fontWeight:600, marginBottom:6}}>Generate PINs</div>
       <div className="row" style={{gap:8, alignItems:"center"}}>
-        <input className="input" style={{width:140}} value={genCount} onChange={e=>setGenCount(e.target.value)} placeholder="How many (e.g., 172)" />
+        <input className="input" style={{width:160}} value={genCount} onChange={e=>setGenCount(e.target.value)} placeholder="How many (e.g., 172)" />
         <button className="btn primary" onClick={generatePins}>Generate PINs</button>
-        <span className="notice">Generates unique 6-digit PINs with tokens for this poll.</span>
+        <span className="notice">Unique 6-digit codes; token auto-created.</span>
       </div>
     </div>
 
@@ -329,7 +393,7 @@ function AdminDashboard(){
           {pins.map((p,i)=>(<tr key={i}>
             <td className="mono">{p.pin}</td><td>{p.unit||""}</td><td>{p.owner_name||""}</td>
             <td>{p.used_at? new Date(p.used_at).toLocaleString(): ""}</td><td>{p.used_option||""}</td>
-            <td><a href={`${siteUrl}/?t=${p.token}`} target="_blank">{`/?t=${p.token}`}</a></td>
+            <td><a href={`${siteUrl}/?t=${p.token}`} target="_blank" rel="noreferrer">{`/?t=${p.token}`}</a></td>
           </tr>))}
         </tbody></table>
       </div>
