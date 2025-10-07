@@ -1,0 +1,24 @@
+{
+  "name": "indah-samudra-full-vite-qr",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "qrcode.react": "^3.1.0",
+    "qrcode": "^1.5.3",
+    "pdfkit": "^0.13.0",
+    "resend": "^4.0.0",
+    "twilio": "^4.22.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.3",
+    "@vitejs/plugin-react": "^4.3.1"
+  }
+}
