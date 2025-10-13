@@ -1,0 +1,18 @@
+{
+  "name": "indah-samudra-vote",
+  "private": true,
+  "version": "6.3.0",
+  "type": "module",
+  "scripts": { "dev":"vite", "build":"vite build", "preview":"vite preview" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "papaparse": "^5.4.1",
+    "qrcode": "^1.5.3",
+    "jspdf": "^2.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.1"
+  },
+  "devDependencies": { "vite": "^5.4.8", "@vitejs/plugin-react": "^4.3.1" },
+  "engines": { "node": ">=18.17 <21" }
+}

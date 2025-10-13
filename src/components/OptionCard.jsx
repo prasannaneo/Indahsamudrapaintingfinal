@@ -1,0 +1,14 @@
+import React from 'react';
+export default function OptionCard({label, img, selected, onSelect, onPreview}){
+  return (
+    <div className="card option" onClick={onSelect} role="button" tabIndex={0} style={{cursor:'pointer'}}>
+      {selected && <div className="sel-ring"></div>}
+      {selected && <div className="sel-check">Selected</div>}
+      <img className="thumb" src={img} alt={`Option ${label}`} onClick={(e)=>{e.stopPropagation(); onPreview && onPreview(img, label);}}/>
+      <div className="row" style={{justifyContent:'space-between', marginTop:12}}>
+        <div style={{fontWeight:700, fontSize:16}}>Option {label}</div>
+        <div className="dot" style={{width:14, height:14, borderRadius:999, border:'2px solid #111827', background:selected?'#111827':'transparent'}} />
+      </div>
+    </div>
+  );
+}
